@@ -224,7 +224,7 @@ form textarea { min-height: 6rem; resize: vertical; }
 .hike-date-row input[type=date] { padding: 0.25rem 0.4rem; border: 1px solid #ccc; border-radius: 4px; font-size: 0.875rem; font-family: inherit; margin: 0; width: auto; }
 
 /* Calendar */
-.cal-table { width: 100%; border-collapse: collapse; min-width: 560px; }
+.cal-table { width: 100%; border-collapse: collapse; min-width: 560px; table-layout: fixed; }
 .cal-table th { background: #333; color: #fff; padding: 0.5rem; text-align: center; font-size: 0.85rem; font-weight: normal; }
 .cal-cell { border: 1px solid #ddd; vertical-align: top; padding: 0.4rem; background: #fff; width: 14.28%; }
 .cal-today { background: #fffbe6; border-color: #f0c040; }

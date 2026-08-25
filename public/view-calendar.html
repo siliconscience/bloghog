@@ -140,6 +140,10 @@ function goToToday() {
 const MONTH_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const LETTERS = 'abcdefghijklmnopqrstuvwxyz';
 
+function displayTitle(title) {
+  return title.replace(/^\d{4}-\d{2}-\d{2}\s+/, '');
+}
+
 function renderCalendar() {
   const byDate = {};
   for (const post of allPosts) {
@@ -178,11 +182,11 @@ function renderCalendar() {
         const p = posts[0];
         html += `<td class="cal-cell cal-cell-one${todayCls}" onclick="location.href='${viewUrl(p)}'">
           <div class="cal-day-num">${dayLabel}</div>
-          <span class="cal-post" title="${esc(p.title)}">${esc(p.title)}</span>
+          <span class="cal-post" title="${esc(p.title)}">${esc(displayTitle(p.title))}</span>
         </td>`;
       } else {
         const links = posts.map((p, i) =>
-          `<a href="${viewUrl(p)}" class="cal-post" title="${esc(p.title)}">${dayNum}${LETTERS[i]} — ${esc(p.title)}</a>`
+          `<a href="${viewUrl(p)}" class="cal-post" title="${esc(p.title)}">${dayNum}${LETTERS[i]} — ${esc(displayTitle(p.title))}</a>`
         ).join('');
         html += `<td class="cal-cell${todayCls}">
           <div class="cal-day-num">${dayLabel}</div>

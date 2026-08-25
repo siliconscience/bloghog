@@ -105,6 +105,20 @@ function esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+function linkify(text) {
+  const urlRe = /https?:\/\/[^\s<>"{}|\\^`[\]]+/g;
+  const parts = [];
+  let last = 0, m;
+  while ((m = urlRe.exec(text)) !== null) {
+    if (m.index > last) parts.push(esc(text.slice(last, m.index)));
+    const url = m[0].replace(/[.,;:!?'")\]]+$/, '');
+    parts.push(`<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(url)}</a>`);
+    last = m.index + url.length;
+  }
+  if (last < text.length) parts.push(esc(text.slice(last)));
+  return parts.join('');
+}
+
 let currentUsername = null;
 let postContent = [];
 let editingBlockId = null;
@@ -220,7 +234,7 @@ function renderBlock(b) {
     return `
       <div class="block block-editable" onclick="startEditText('${esc(b.id)}')">
         <div class="block-label">Text &nbsp;<span class="edit-hint">click to edit</span></div>
-        <p>${esc(b.text)}</p>
+        <p>${linkify(b.text)}</p>
       </div>`;
   }
   if (b.type === 'image') {
@@ -278,7 +292,7 @@ function renderTableCell(blockId, row, col, cell, flatIdx) {
     return `<td class="table-cell table-cell-empty" onclick="${onclick}" ${drag}><span class="cell-add">+</span></td>`;
   }
   if (cell.type === 'text') {
-    return `<td class="table-cell table-cell-filled" onclick="${onclick}" ${drag}><p>${esc(cell.text)}</p></td>`;
+    return `<td class="table-cell table-cell-filled" onclick="${onclick}" ${drag}><p>${linkify(cell.text)}</p></td>`;
   }
   if (cell.type === 'image') {
     return `<td class="table-cell table-cell-filled" onclick="${onclick}" ${drag}>
