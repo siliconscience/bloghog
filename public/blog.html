@@ -82,7 +82,7 @@ async function loadBlog() {
   document.getElementById('blog-name-crumb').textContent = blog.name;
   document.getElementById('blog-purpose').textContent = blog.purpose || '';
   document.getElementById('view-blog-link').href =
-    `/view-blog.html?user=${encodeURIComponent(currentUsername)}&blog=${encodeURIComponent(blogId)}`;
+    `/view-calendar.html?user=${encodeURIComponent(currentUsername)}&blog=${encodeURIComponent(blogId)}`;
   document.getElementById('calendar-link').href = `/calendar.html?blog=${encodeURIComponent(blogId)}`;
   loadPosts();
 }

@@ -131,7 +131,7 @@ async function loadPost() {
   document.title = post.title;
   document.getElementById('post-title').textContent = post.title;
   document.getElementById('post-title-crumb').textContent = post.title;
-  document.getElementById('blog-link').href = `/blog.html?id=${blogId}`;
+  document.getElementById('blog-link').href = `/calendar.html?blog=${blogId}`;
   document.getElementById('hike-date-input').value = post.hikeDate || '';
   editingBlockId = null;
   selectedImageId = null;

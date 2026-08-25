@@ -8,28 +8,11 @@
 </head>
 <body>
 <header>
-  <h1>Blog</h1>
-  <div class="user-info">
-    <span id="username-display"></span>
-    <button class="btn btn-secondary btn-sm" onclick="logout()">Sign Out</button>
-  </div>
+  <h1 id="blog-name-header" style="cursor:pointer"></h1>
+  <div class="user-info" id="header-actions"></div>
 </header>
 
 <div class="container" style="max-width:900px">
-  <div class="breadcrumb">
-    <a href="/dashboard.html">My Blogs</a> ›
-    <a href="#" id="blog-link">Blog</a> ›
-    Calendar
-  </div>
-
-  <div class="page-title">
-    <h2 id="blog-title">Calendar</h2>
-    <div style="display:flex; gap:0.5rem; align-items:center">
-      <a id="list-link" href="#" class="btn btn-secondary btn-sm">List view</a>
-      <button class="btn btn-primary" onclick="openCreateModal(toLocalDateStr(new Date()))">+ New Post</button>
-    </div>
-  </div>
-
   <div class="cal-controls">
     <div style="display:flex; gap:0.5rem; align-items:center">
       <label for="start-date-input" style="font-size:0.85rem; color:#666; margin:0; white-space:nowrap">Start week:</label>
@@ -41,23 +24,6 @@
     <div style="display:flex; gap:0.5rem; align-items:center">
       <span style="font-size:0.85rem; color:#666">Weeks:</span>
       <div class="week-controls" id="week-controls"></div>
-    </div>
-  </div>
-
-  <!-- Create post modal -->
-  <div class="modal-overlay" id="create-modal">
-    <div class="modal">
-      <h3>New Post</h3>
-      <div id="create-modal-msg"></div>
-      <form id="create-form">
-        <label>Title</label>
-        <input type="text" id="create-title" required placeholder="Post title">
-        <input type="hidden" id="create-hikedate">
-        <div class="modal-actions">
-          <button type="button" class="btn btn-secondary" onclick="closeCreateModal()">Cancel</button>
-          <button type="submit" class="btn btn-primary">Create</button>
-        </div>
-      </form>
     </div>
   </div>
 
@@ -81,8 +47,9 @@
 
 <script>
 const params = new URLSearchParams(location.search);
+const username = params.get('user');
 const blogId = params.get('blog');
-if (!blogId) window.location.href = '/dashboard.html';
+if (!username || !blogId) window.location.href = '/';
 
 let numWeeks = 8;
 let allPosts = [];
@@ -116,25 +83,24 @@ function addDays(date, n) {
 }
 
 async function init() {
-  const me = await fetch('/auth/me');
-  if (!me.ok) { window.location.href = '/'; return; }
-  const { username } = await me.json();
-  document.getElementById('username-display').textContent = username;
+  const me = await fetch('/auth/me').then(r => r.ok ? r.json() : null);
+  if (me && me.username === username) {
+    document.getElementById('header-actions').innerHTML =
+      `<a href="/calendar.html?blog=${esc(blogId)}" class="btn btn-secondary btn-sm">Edit Blog</a>`;
+  }
 
-  const blogsRes = await fetch('/api/blogs');
-  const blogs = await blogsRes.json();
-  const blog = blogs.find(b => b.id === blogId);
-  if (!blog) { window.location.href = '/dashboard.html'; return; }
+  const blogRes = await fetch(`/api/view/${username}/${blogId}`);
+  if (!blogRes.ok) { window.location.href = '/'; return; }
+  const blog = await blogRes.json();
 
   document.title = blog.name + ' — Calendar';
-  document.getElementById('blog-title').textContent = blog.name + ' — Calendar';
-  document.getElementById('blog-link').href = `/blog.html?id=${encodeURIComponent(blogId)}`;
-  document.getElementById('blog-link').textContent = blog.name;
+  const header = document.getElementById('blog-name-header');
+  header.textContent = blog.name;
+  header.onclick = () => window.location.href = `/view-calendar.html?user=${encodeURIComponent(username)}&blog=${encodeURIComponent(blogId)}`;
 
-  const postsRes = await fetch(`/api/blogs/${blogId}/posts`);
+  const postsRes = await fetch(`/api/view/${username}/${blogId}/posts`);
   allPosts = await postsRes.json();
 
-  document.getElementById('list-link').href = `/blog.html?id=${encodeURIComponent(blogId)}`;
   document.getElementById('start-date-input').value = toLocalDateStr(startDate);
   renderWeekControls();
   renderCalendar();
@@ -178,7 +144,7 @@ function renderCalendar() {
   const byDate = {};
   for (const post of allPosts) {
     if (!post.hikeDate) continue;
-    const dateKey = post.hikeDate.slice(0, 10); // handle full ISO timestamps
+    const dateKey = post.hikeDate.slice(0, 10);
     if (!byDate[dateKey]) byDate[dateKey] = [];
     byDate[dateKey].push(post);
   }
@@ -201,21 +167,22 @@ function renderCalendar() {
 
       const showMonth = dayNum === 1 || (w === 0 && d === 0);
       const dayLabel = showMonth ? `${MONTH_SHORT[day.getMonth()]} ${dayNum}` : `${dayNum}`;
-
       const todayCls = isToday ? ' cal-today' : '';
+      const viewUrl = (p) => `/view-post.html?user=${esc(username)}&blog=${esc(blogId)}&post=${esc(p.id)}`;
+
       if (posts.length === 0) {
-        html += `<td class="cal-cell cal-cell-empty${todayCls}" onclick="openCreateModal('${dateStr}')">
+        html += `<td class="cal-cell${todayCls}">
           <div class="cal-day-num">${dayLabel}</div>
         </td>`;
       } else if (posts.length === 1) {
         const p = posts[0];
-        html += `<td class="cal-cell cal-cell-one${todayCls}" onclick="location.href='/post.html?blog=${esc(blogId)}&post=${esc(p.id)}'">
+        html += `<td class="cal-cell cal-cell-one${todayCls}" onclick="location.href='${viewUrl(p)}'">
           <div class="cal-day-num">${dayLabel}</div>
           <span class="cal-post" title="${esc(p.title)}">${esc(p.title)}</span>
         </td>`;
       } else {
         const links = posts.map((p, i) =>
-          `<a href="/post.html?blog=${esc(blogId)}&post=${esc(p.id)}" class="cal-post" title="${esc(p.title)}">${dayNum}${LETTERS[i]} — ${esc(p.title)}</a>`
+          `<a href="${viewUrl(p)}" class="cal-post" title="${esc(p.title)}">${dayNum}${LETTERS[i]} — ${esc(p.title)}</a>`
         ).join('');
         html += `<td class="cal-cell${todayCls}">
           <div class="cal-day-num">${dayLabel}</div>
@@ -228,40 +195,6 @@ function renderCalendar() {
 
   document.getElementById('cal-body').innerHTML = html;
 }
-
-function openCreateModal(dateStr) {
-  document.getElementById('create-title').value = dateStr + ' ';
-  document.getElementById('create-hikedate').value = dateStr;
-  document.getElementById('create-modal').classList.add('open');
-  const input = document.getElementById('create-title');
-  input.focus();
-  input.setSelectionRange(input.value.length, input.value.length);
-}
-
-function closeCreateModal() {
-  document.getElementById('create-modal').classList.remove('open');
-  document.getElementById('create-form').reset();
-  document.getElementById('create-modal-msg').innerHTML = '';
-}
-
-document.getElementById('create-form').addEventListener('submit', async e => {
-  e.preventDefault();
-  const title = document.getElementById('create-title').value;
-  const hikeDate = document.getElementById('create-hikedate').value;
-  const res = await fetch(`/api/blogs/${blogId}/posts`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ title, hikeDate })
-  });
-  const data = await res.json();
-  if (res.ok) {
-    window.location.href = `/post.html?blog=${encodeURIComponent(blogId)}&post=${encodeURIComponent(data.id)}`;
-  } else {
-    document.getElementById('create-modal-msg').innerHTML = `<div class="error-msg">${data.error}</div>`;
-  }
-});
-
-async function logout() { await fetch('/auth/logout', { method: 'POST' }); window.location.href = '/'; }
 
 init();
 </script>

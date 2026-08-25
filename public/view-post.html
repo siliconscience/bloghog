@@ -30,7 +30,7 @@ const blogId = params.get('blog');
 const postId = params.get('post');
 if (!username || !blogId || !postId) window.location.href = '/';
 
-const blogHomeUrl = `/view-blog.html?user=${encodeURIComponent(username)}&blog=${encodeURIComponent(blogId)}`;
+const blogHomeUrl = `/view-calendar.html?user=${encodeURIComponent(username)}&blog=${encodeURIComponent(blogId)}`;
 
 function esc(s) {
   if (!s) return '';

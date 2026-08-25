@@ -64,7 +64,7 @@ async function loadBlogs() {
       <h2>${esc(b.name)}</h2>
       <p>${esc(b.purpose) || '<em>No description</em>'}</p>
       <div style="display:flex; gap:0.5rem; margin-top:0.5rem">
-        <a href="/blog.html?id=${esc(b.id)}" class="btn btn-secondary btn-sm">Open</a>
+        <a href="/calendar.html?blog=${esc(b.id)}" class="btn btn-secondary btn-sm">Open</a>
         <button class="btn btn-danger btn-sm" onclick="deleteBlog('${esc(b.id)}', '${esc(b.name)}')">Delete</button>
       </div>
     </div>
