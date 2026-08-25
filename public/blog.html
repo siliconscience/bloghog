@@ -22,6 +22,7 @@
     <h2 id="blog-title"></h2>
     <div style="display:flex; gap:0.5rem; align-items:center">
       <a id="view-blog-link" href="#" class="btn btn-secondary btn-sm">View Blog</a>
+      <a id="calendar-link" href="#" class="btn btn-secondary btn-sm">Calendar</a>
       <button class="btn btn-danger btn-sm" onclick="deleteBlog()">Delete Blog</button>
       <button class="btn btn-primary" onclick="openModal()">+ New Post</button>
     </div>
@@ -40,6 +41,8 @@
     <form id="post-form">
       <label>Title</label>
       <input type="text" id="post-title" required placeholder="Post title">
+      <label>Hike Date</label>
+      <input type="date" id="post-hikedate">
       <div class="modal-actions">
         <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
         <button type="submit" class="btn btn-primary">Create</button>
@@ -80,6 +83,7 @@ async function loadBlog() {
   document.getElementById('blog-purpose').textContent = blog.purpose || '';
   document.getElementById('view-blog-link').href =
     `/view-blog.html?user=${encodeURIComponent(currentUsername)}&blog=${encodeURIComponent(blogId)}`;
+  document.getElementById('calendar-link').href = `/calendar.html?blog=${encodeURIComponent(blogId)}`;
   loadPosts();
 }
 
@@ -109,7 +113,7 @@ document.getElementById('post-form').addEventListener('submit', async e => {
   const res = await fetch(`/api/blogs/${blogId}/posts`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ title: document.getElementById('post-title').value })
+    body: JSON.stringify({ title: document.getElementById('post-title').value, hikeDate: document.getElementById('post-hikedate').value || undefined })
   });
   const data = await res.json();
   if (res.ok) {
@@ -137,6 +141,7 @@ function openModal() {
   const today = new Date().toISOString().slice(0, 10);
   const input = document.getElementById('post-title');
   input.value = today + ' ';
+  document.getElementById('post-hikedate').value = today;
   document.getElementById('modal').classList.add('open');
   input.focus();
   input.setSelectionRange(input.value.length, input.value.length);

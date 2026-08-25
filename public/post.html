@@ -27,6 +27,12 @@
     <a id="view-post-link" href="#" class="btn btn-secondary btn-sm">View Post</a>
   </div>
 
+  <div class="hike-date-row">
+    <label for="hike-date-input">Hike Date:</label>
+    <input type="date" id="hike-date-input">
+    <button class="btn btn-secondary btn-sm" onclick="saveHikeDate()">Save</button>
+  </div>
+
   <div id="post-content" class="post-content"></div>
 
   <div class="add-block-area">
@@ -126,6 +132,7 @@ async function loadPost() {
   document.getElementById('post-title').textContent = post.title;
   document.getElementById('post-title-crumb').textContent = post.title;
   document.getElementById('blog-link').href = `/blog.html?id=${blogId}`;
+  document.getElementById('hike-date-input').value = post.hikeDate || '';
   editingBlockId = null;
   selectedImageId = null;
   renderContent(post.content);
@@ -579,6 +586,15 @@ document.getElementById('image-input').addEventListener('change', async e => {
   else { const d = await res.json(); alert('Upload failed: ' + d.error); }
   e.target.value = '';
 });
+
+async function saveHikeDate() {
+  const hikeDate = document.getElementById('hike-date-input').value;
+  await fetch(`/api/blogs/${blogId}/posts/${postId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ hikeDate })
+  });
+}
 
 async function logout() { await fetch('/auth/logout', { method: 'POST' }); window.location.href = '/'; }
 

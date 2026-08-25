@@ -186,7 +186,7 @@ app.get('/api/blogs/:blogId/posts', requireAuth, (req, res) => {
 });
 
 app.post('/api/blogs/:blogId/posts', requireAuth, (req, res) => {
-  const { title } = req.body;
+  const { title, hikeDate } = req.body;
   if (!title) return res.status(400).json({ error: 'Title required' });
 
   const id = uuidv4();
@@ -194,10 +194,22 @@ app.post('/api/blogs/:blogId/posts', requireAuth, (req, res) => {
   ensureDir(path.join(dir, 'images'));
 
   const meta = { title, createdAt: new Date().toISOString() };
+  if (hikeDate) meta.hikeDate = hikeDate;
   writeJson(path.join(dir, 'meta.json'), meta);
   writeJson(path.join(dir, 'content.json'), []);
 
   res.status(201).json({ id, ...meta });
+});
+
+app.patch('/api/blogs/:blogId/posts/:postId', requireAuth, (req, res) => {
+  const dir = postDir(req.session.username, req.params.blogId, req.params.postId);
+  if (!fs.existsSync(dir)) return res.status(404).json({ error: 'Post not found' });
+  const metaFile = path.join(dir, 'meta.json');
+  const meta = readJson(metaFile);
+  if (req.body.title !== undefined) meta.title = req.body.title;
+  if (req.body.hikeDate !== undefined) meta.hikeDate = req.body.hikeDate;
+  writeJson(metaFile, meta);
+  res.json({ id: req.params.postId, ...meta });
 });
 
 app.get('/api/blogs/:blogId/posts/:postId', requireAuth, (req, res) => {

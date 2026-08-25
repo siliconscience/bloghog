@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Calendar</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>Blog</h1>
+  <div class="user-info">
+    <span id="username-display"></span>
+    <button class="btn btn-secondary btn-sm" onclick="logout()">Sign Out</button>
+  </div>
+</header>
+
+<div class="container" style="max-width:900px">
+  <div class="breadcrumb">
+    <a href="/dashboard.html">My Blogs</a> ›
+    <a href="#" id="blog-link">Blog</a> ›
+    Calendar
+  </div>
+
+  <div class="page-title">
+    <h2 id="blog-title">Calendar</h2>
+  </div>
+
+  <div class="cal-controls">
+    <div style="display:flex; gap:0.5rem; align-items:center">
+      <label for="start-date-input" style="font-size:0.85rem; color:#666; margin:0; white-space:nowrap">Start week:</label>
+      <button class="btn btn-secondary btn-sm" onclick="shiftWeeks(-1)">&#8592;</button>
+      <input type="date" id="start-date-input" onchange="setStartDate(this.value)">
+      <button class="btn btn-secondary btn-sm" onclick="shiftWeeks(1)">&#8594;</button>
+      <button class="btn btn-secondary btn-sm" onclick="goToToday()">Today</button>
+    </div>
+    <div style="display:flex; gap:0.5rem; align-items:center">
+      <span style="font-size:0.85rem; color:#666">Weeks:</span>
+      <div class="week-controls" id="week-controls"></div>
+    </div>
+  </div>
+
+  <!-- Create post modal -->
+  <div class="modal-overlay" id="create-modal">
+    <div class="modal">
+      <h3>New Post</h3>
+      <div id="create-modal-msg"></div>
+      <form id="create-form">
+        <label>Title</label>
+        <input type="text" id="create-title" required placeholder="Post title">
+        <input type="hidden" id="create-hikedate">
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" onclick="closeCreateModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary">Create</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div style="overflow-x:auto">
+    <table class="cal-table">
+      <thead>
+        <tr>
+          <th>Mon</th>
+          <th>Tue</th>
+          <th>Wed</th>
+          <th>Thu</th>
+          <th>Fri</th>
+          <th>Sat</th>
+          <th>Sun</th>
+        </tr>
+      </thead>
+      <tbody id="cal-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+const params = new URLSearchParams(location.search);
+const blogId = params.get('blog');
+if (!blogId) window.location.href = '/dashboard.html';
+
+let numWeeks = 8;
+let allPosts = [];
+let startDate = new Date();
+
+function esc(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function toLocalDateStr(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function getMondayOfWeek(date) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  const day = d.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  return d;
+}
+
+function addDays(date, n) {
+  const d = new Date(date);
+  d.setDate(d.getDate() + n);
+  return d;
+}
+
+async function init() {
+  const me = await fetch('/auth/me');
+  if (!me.ok) { window.location.href = '/'; return; }
+  const { username } = await me.json();
+  document.getElementById('username-display').textContent = username;
+
+  const blogsRes = await fetch('/api/blogs');
+  const blogs = await blogsRes.json();
+  const blog = blogs.find(b => b.id === blogId);
+  if (!blog) { window.location.href = '/dashboard.html'; return; }
+
+  document.title = blog.name + ' — Calendar';
+  document.getElementById('blog-title').textContent = blog.name + ' — Calendar';
+  document.getElementById('blog-link').href = `/blog.html?id=${encodeURIComponent(blogId)}`;
+  document.getElementById('blog-link').textContent = blog.name;
+
+  const postsRes = await fetch(`/api/blogs/${blogId}/posts`);
+  allPosts = await postsRes.json();
+
+  document.getElementById('start-date-input').value = toLocalDateStr(startDate);
+  renderWeekControls();
+  renderCalendar();
+}
+
+function renderWeekControls() {
+  const el = document.getElementById('week-controls');
+  el.innerHTML = [4, 5, 6, 7, 8].map(n =>
+    `<button class="btn btn-sm ${n === numWeeks ? 'btn-primary' : 'btn-secondary'}" onclick="setWeeks(${n})">${n}</button>`
+  ).join('');
+}
+
+function setWeeks(n) {
+  numWeeks = n;
+  renderWeekControls();
+  renderCalendar();
+}
+
+function setStartDate(val) {
+  if (!val) return;
+  startDate = new Date(val + 'T00:00:00');
+  renderCalendar();
+}
+
+function shiftWeeks(n) {
+  startDate = addDays(getMondayOfWeek(startDate), n * 7);
+  document.getElementById('start-date-input').value = toLocalDateStr(startDate);
+  renderCalendar();
+}
+
+function goToToday() {
+  startDate = new Date();
+  document.getElementById('start-date-input').value = toLocalDateStr(startDate);
+  renderCalendar();
+}
+
+const MONTH_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const LETTERS = 'abcdefghijklmnopqrstuvwxyz';
+
+function renderCalendar() {
+  const byDate = {};
+  for (const post of allPosts) {
+    if (!post.hikeDate) continue;
+    const dateKey = post.hikeDate.slice(0, 10); // handle full ISO timestamps
+    if (!byDate[dateKey]) byDate[dateKey] = [];
+    byDate[dateKey].push(post);
+  }
+  for (const d of Object.keys(byDate)) {
+    byDate[d].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+  }
+
+  const today = toLocalDateStr(new Date());
+  const startMonday = getMondayOfWeek(startDate);
+
+  let html = '';
+  for (let w = 0; w < numWeeks; w++) {
+    html += '<tr>';
+    for (let d = 0; d < 7; d++) {
+      const day = addDays(startMonday, w * 7 + d);
+      const dateStr = toLocalDateStr(day);
+      const isToday = dateStr === today;
+      const dayNum = day.getDate();
+      const posts = byDate[dateStr] || [];
+
+      const showMonth = dayNum === 1 || (w === 0 && d === 0);
+      const dayLabel = showMonth ? `${MONTH_SHORT[day.getMonth()]} ${dayNum}` : `${dayNum}`;
+
+      const todayCls = isToday ? ' cal-today' : '';
+      if (posts.length === 0) {
+        html += `<td class="cal-cell cal-cell-empty${todayCls}" onclick="openCreateModal('${dateStr}')">
+          <div class="cal-day-num">${dayLabel}</div>
+        </td>`;
+      } else if (posts.length === 1) {
+        const p = posts[0];
+        html += `<td class="cal-cell cal-cell-one${todayCls}" onclick="location.href='/post.html?blog=${esc(blogId)}&post=${esc(p.id)}'">
+          <div class="cal-day-num">${dayLabel}</div>
+          <span class="cal-post" title="${esc(p.title)}">${esc(p.title)}</span>
+        </td>`;
+      } else {
+        const links = posts.map((p, i) =>
+          `<a href="/post.html?blog=${esc(blogId)}&post=${esc(p.id)}" class="cal-post" title="${esc(p.title)}">${dayNum}${LETTERS[i]} — ${esc(p.title)}</a>`
+        ).join('');
+        html += `<td class="cal-cell${todayCls}">
+          <div class="cal-day-num">${dayLabel}</div>
+          ${links}
+        </td>`;
+      }
+    }
+    html += '</tr>';
+  }
+
+  document.getElementById('cal-body').innerHTML = html;
+}
+
+function openCreateModal(dateStr) {
+  document.getElementById('create-title').value = dateStr + ' ';
+  document.getElementById('create-hikedate').value = dateStr;
+  document.getElementById('create-modal').classList.add('open');
+  const input = document.getElementById('create-title');
+  input.focus();
+  input.setSelectionRange(input.value.length, input.value.length);
+}
+
+function closeCreateModal() {
+  document.getElementById('create-modal').classList.remove('open');
+  document.getElementById('create-form').reset();
+  document.getElementById('create-modal-msg').innerHTML = '';
+}
+
+document.getElementById('create-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const title = document.getElementById('create-title').value;
+  const hikeDate = document.getElementById('create-hikedate').value;
+  const res = await fetch(`/api/blogs/${blogId}/posts`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title, hikeDate })
+  });
+  const data = await res.json();
+  if (res.ok) {
+    window.location.href = `/post.html?blog=${encodeURIComponent(blogId)}&post=${encodeURIComponent(data.id)}`;
+  } else {
+    document.getElementById('create-modal-msg').innerHTML = `<div class="error-msg">${data.error}</div>`;
+  }
+});
+
+async function logout() { await fetch('/auth/logout', { method: 'POST' }); window.location.href = '/'; }
+
+init();
+</script>
+</body>
+</html>
