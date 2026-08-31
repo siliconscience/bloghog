@@ -7,7 +7,8 @@ const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
 
 const app = express();
-const PORT = 3000;
+// Use Railway's provided port if available, otherwise fall back to 8000 locally
+const PORT = process.env.PORT || 8000;
 
 // --- Data directory setup ---
 const DATA_DIR = path.join(__dirname, 'data');
@@ -576,5 +577,6 @@ app.get('/api/view/:username/:blogId/posts/:postId', (req, res) => {
   const content = readJson(path.join(dir, 'content.json'));
   res.json({ id: req.params.postId, ...meta, content });
 });
+
 
 app.listen(PORT, () => console.log(`Blog server running at http://localhost:${PORT}`));
