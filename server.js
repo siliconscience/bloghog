@@ -11,7 +11,8 @@ const app = express();
 const PORT = process.env.PORT || 8000;
 
 // --- Data directory setup ---
-const DATA_DIR = path.join(__dirname, 'data');
+// Set DATA_DIR to a mounted volume path in production so data survives redeploys.
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
 const BLOGS_DIR = path.join(DATA_DIR, 'blogs');
 
