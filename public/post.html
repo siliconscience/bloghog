@@ -135,6 +135,12 @@ async function init() {
   document.getElementById('username-display').textContent = username;
   document.getElementById('view-post-link').href =
     `/view-post.html?user=${encodeURIComponent(username)}&blog=${encodeURIComponent(blogId)}&post=${encodeURIComponent(postId)}`;
+
+  fetch('/api/blogs').then(r => r.json()).then(blogs => {
+    const blog = blogs.find(b => b.id === blogId);
+    if (blog) document.getElementById('blog-link').textContent = blog.name;
+  });
+
   loadPost();
 }
 
@@ -165,7 +171,12 @@ function renderContent(blocks) {
   el.innerHTML = html;
   if (editingBlockId) {
     const ta = document.getElementById(`edit-ta-${editingBlockId}`);
-    if (ta) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
+    if (ta) {
+      ta.style.height = 'auto';
+      ta.style.height = ta.scrollHeight + 'px';
+      ta.focus();
+      ta.setSelectionRange(ta.value.length, ta.value.length);
+    }
   }
 }
 
@@ -222,9 +233,12 @@ function insertGalleryAt(idx) {
 function renderBlock(b) {
   if (b.type === 'text') {
     if (editingBlockId === b.id) {
+      const lines = (b.text.match(/\n/g) || []).length + 1;
+      const rows = Math.max(5, Math.ceil(lines / 2));
       return `
         <div class="block block-editing">
-          <textarea class="block-edit-textarea" id="edit-ta-${esc(b.id)}">${esc(b.text)}</textarea>
+          <textarea class="block-edit-textarea" id="edit-ta-${esc(b.id)}" rows="${rows}"
+            oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'">${esc(b.text)}</textarea>
           <div class="block-edit-actions">
             <button class="btn btn-primary btn-sm" onclick="saveTextBlock('${esc(b.id)}')">Save</button>
             <button class="btn btn-secondary btn-sm" onclick="cancelEdit()">Cancel</button>

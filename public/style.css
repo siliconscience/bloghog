@@ -1,7 +1,9 @@
+@import url('https://fonts.googleapis.com/css2?family=Lato:ital,wght@0,400;0,700;1,400&display=swap');
+
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  font-family: Georgia, serif;
+  font-family: 'Lato', sans-serif;
   background: #f5f5f0;
   color: #222;
   min-height: 100vh;
@@ -211,9 +213,10 @@ form textarea { min-height: 6rem; resize: vertical; }
 .block-editing { border-color: #555; }
 .block-selected { border-color: #555; }
 .block-edit-textarea {
-  width: 100%; min-height: 6rem; padding: 0.5rem;
+  width: 100%; min-height: 3rem; padding: 0.5rem;
   border: 1px solid #ccc; border-radius: 4px;
   font-size: 1rem; font-family: inherit; resize: vertical; margin-bottom: 0.5rem;
+  overflow-y: hidden;
 }
 .block-edit-actions { display: flex; gap: 0.5rem; }
 .block-image-actions { display: flex; gap: 0.5rem; margin-top: 0.75rem; }
