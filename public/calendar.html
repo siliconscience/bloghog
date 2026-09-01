@@ -26,6 +26,7 @@
     <h2 id="blog-title">Calendar</h2>
     <div style="display:flex; gap:0.5rem; align-items:center">
       <a id="list-link" href="#" class="btn btn-secondary btn-sm">List view</a>
+      <button class="btn btn-secondary" onclick="openImportModal()">Import Post</button>
       <button class="btn btn-primary" onclick="openCreateModal(toLocalDateStr(new Date()))">+ New Post</button>
     </div>
   </div>
@@ -56,6 +57,26 @@
         <div class="modal-actions">
           <button type="button" class="btn btn-secondary" onclick="closeCreateModal()">Cancel</button>
           <button type="submit" class="btn btn-primary">Create</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Import from WordPress modal -->
+  <div class="modal-overlay" id="import-modal">
+    <div class="modal">
+      <h3>Import Post from WordPress</h3>
+      <div id="import-modal-msg"></div>
+      <form id="import-form">
+        <label>WordPress post URL</label>
+        <input type="url" id="import-url" required placeholder="https://example.wordpress.com/2026/01/01/my-post/">
+        <label>Title <span style="font-weight:normal; color:#888">(optional — defaults to the WordPress title)</span></label>
+        <input type="text" id="import-title" placeholder="Leave blank to use the WordPress title">
+        <label>Hike Date <span style="font-weight:normal; color:#888">(optional — defaults to the WordPress publish date)</span></label>
+        <input type="date" id="import-hikedate">
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" onclick="closeImportModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="import-submit">Import</button>
         </div>
       </form>
     </div>
@@ -265,6 +286,17 @@ function closeCreateModal() {
   document.getElementById('create-modal-msg').innerHTML = '';
 }
 
+function openImportModal() {
+  document.getElementById('import-modal').classList.add('open');
+  document.getElementById('import-url').focus();
+}
+
+function closeImportModal() {
+  document.getElementById('import-modal').classList.remove('open');
+  document.getElementById('import-form').reset();
+  document.getElementById('import-modal-msg').innerHTML = '';
+}
+
 document.getElementById('create-form').addEventListener('submit', async e => {
   e.preventDefault();
   const title = document.getElementById('create-title').value;
@@ -280,6 +312,33 @@ document.getElementById('create-form').addEventListener('submit', async e => {
     window.location.href = `/post.html?blog=${encodeURIComponent(blogId)}&post=${encodeURIComponent(data.id)}&doi=${encodeURIComponent(doi)}`;
   } else {
     document.getElementById('create-modal-msg').innerHTML = `<div class="error-msg">${data.error}</div>`;
+  }
+});
+
+document.getElementById('import-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const url = document.getElementById('import-url').value;
+  const title = document.getElementById('import-title').value;
+  const hikeDate = document.getElementById('import-hikedate').value;
+
+  const submitBtn = document.getElementById('import-submit');
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Importing…';
+  document.getElementById('import-modal-msg').innerHTML = '';
+
+  const res = await fetch(`/api/blogs/${blogId}/posts/import-wordpress`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url, title: title || undefined, hikeDate: hikeDate || undefined })
+  });
+  const data = await res.json();
+  if (res.ok) {
+    const doi = toLocalDateStr(addDays(startDate, LOOKBACK_DAYS));
+    window.location.href = `/post.html?blog=${encodeURIComponent(blogId)}&post=${encodeURIComponent(data.id)}&doi=${encodeURIComponent(doi)}`;
+  } else {
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Import';
+    document.getElementById('import-modal-msg').innerHTML = `<div class="error-msg">${data.error}</div>`;
   }
 });
 

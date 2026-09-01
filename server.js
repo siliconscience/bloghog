@@ -6,6 +6,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
+const { fetchWpPost, parseContentBlocks, downloadImage } = require('./lib/wordpress-import');
 
 const app = express();
 // Use Railway's provided port if available, otherwise fall back to 8000 locally
@@ -203,6 +204,66 @@ app.post('/api/blogs/:blogId/posts', requireAuth, (req, res) => {
   if (hikeDate) meta.hikeDate = hikeDate;
   writeJson(path.join(dir, 'meta.json'), meta);
   writeJson(path.join(dir, 'content.json'), []);
+
+  res.status(201).json({ id, ...meta });
+});
+
+// Import a WordPress.com post: fetch it, map its content into blocks, and create the post.
+app.post('/api/blogs/:blogId/posts/import-wordpress', requireAuth, async (req, res) => {
+  const { url, title: titleOverride, hikeDate: hikeDateOverride } = req.body;
+  if (!url) return res.status(400).json({ error: 'WordPress URL required' });
+
+  let wpPost;
+  try {
+    wpPost = await fetchWpPost(url);
+  } catch (err) {
+    return res.status(400).json({ error: `Failed to fetch WordPress post: ${err.message}` });
+  }
+
+  const title = titleOverride || wpPost.title;
+  const hikeDate = hikeDateOverride || wpPost.date.slice(0, 10);
+
+  const id = uuidv4();
+  const dir = postDir(req.session.username, req.params.blogId, id);
+  const imagesDir = path.join(dir, 'images');
+  ensureDir(imagesDir);
+
+  const baseUrl = `/data/blogs/${req.session.username}/${req.params.blogId}/posts/${id}/images/`;
+  async function saveDownloadedImage(src) {
+    const { buffer, filename } = await downloadImage(src);
+    const savedName = uuidv4() + (path.extname(filename) || '.jpg');
+    fs.writeFileSync(path.join(imagesDir, savedName), buffer);
+    return { filename: savedName, url: baseUrl + savedName };
+  }
+
+  const content = [];
+  try {
+    for (const block of parseContentBlocks(wpPost.contentHtml)) {
+      if (block.type === 'text') {
+        content.push({ id: uuidv4(), type: 'text', text: block.text });
+      } else if (block.type === 'image') {
+        const img = await saveDownloadedImage(block.src);
+        content.push({ id: uuidv4(), type: 'image', ...img });
+      } else if (block.type === 'gallery') {
+        const cells = [];
+        for (const src of block.srcs) cells.push({ type: 'image', ...(await saveDownloadedImage(src)) });
+        const rows = [];
+        for (let i = 0; i < cells.length; i += 3) {
+          const row = cells.slice(i, i + 3);
+          while (row.length < 3) row.push(null);
+          rows.push(row);
+        }
+        content.push({ id: uuidv4(), type: 'table', cols: 3, rows });
+      }
+    }
+  } catch (err) {
+    fs.rmSync(dir, { recursive: true, force: true });
+    return res.status(502).json({ error: `Import failed: ${err.message}` });
+  }
+
+  const meta = { title, createdAt: new Date().toISOString(), hikeDate };
+  writeJson(path.join(dir, 'meta.json'), meta);
+  writeJson(path.join(dir, 'content.json'), content);
 
   res.status(201).json({ id, ...meta });
 });
