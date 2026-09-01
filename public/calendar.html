@@ -86,7 +86,11 @@ if (!blogId) window.location.href = '/dashboard.html';
 
 let numWeeks = 8;
 let allPosts = [];
-let startDate = new Date();
+const LOOKBACK_DAYS = 14;
+
+const doiParam = params.get('doi');
+const dateOfInterest = doiParam ? new Date(doiParam + 'T00:00:00') : new Date();
+let startDate = addDays(dateOfInterest, -LOOKBACK_DAYS);
 
 function esc(s) {
   if (!s) return '';
@@ -115,6 +119,13 @@ function addDays(date, n) {
   return d;
 }
 
+function syncUrl() {
+  const doi = toLocalDateStr(addDays(startDate, LOOKBACK_DAYS));
+  const url = new URL(location.href);
+  url.searchParams.set('doi', doi);
+  history.replaceState(null, '', url);
+}
+
 async function init() {
   const me = await fetch('/auth/me');
   if (!me.ok) { window.location.href = '/'; return; }
@@ -136,6 +147,7 @@ async function init() {
 
   document.getElementById('list-link').href = `/blog.html?id=${encodeURIComponent(blogId)}`;
   document.getElementById('start-date-input').value = toLocalDateStr(startDate);
+  syncUrl();
   renderWeekControls();
   renderCalendar();
 }
@@ -156,18 +168,21 @@ function setWeeks(n) {
 function setStartDate(val) {
   if (!val) return;
   startDate = new Date(val + 'T00:00:00');
+  syncUrl();
   renderCalendar();
 }
 
 function shiftWeeks(n) {
   startDate = addDays(getMondayOfWeek(startDate), n * 7);
   document.getElementById('start-date-input').value = toLocalDateStr(startDate);
+  syncUrl();
   renderCalendar();
 }
 
 function goToToday() {
-  startDate = new Date();
+  startDate = addDays(new Date(), -LOOKBACK_DAYS);
   document.getElementById('start-date-input').value = toLocalDateStr(startDate);
+  syncUrl();
   renderCalendar();
 }
 
@@ -207,19 +222,21 @@ function renderCalendar() {
       const dayLabel = showMonth ? `${MONTH_SHORT[day.getMonth()]} ${dayNum}` : `${dayNum}`;
 
       const todayCls = isToday ? ' cal-today' : '';
+      const currentDoi = toLocalDateStr(addDays(startDate, LOOKBACK_DAYS));
+      const postUrl = (p) => `/post.html?blog=${esc(blogId)}&post=${esc(p.id)}&doi=${esc(currentDoi)}`;
       if (posts.length === 0) {
         html += `<td class="cal-cell cal-cell-empty${todayCls}" onclick="openCreateModal('${dateStr}')">
           <div class="cal-day-num">${dayLabel}</div>
         </td>`;
       } else if (posts.length === 1) {
         const p = posts[0];
-        html += `<td class="cal-cell cal-cell-one${todayCls}" onclick="location.href='/post.html?blog=${esc(blogId)}&post=${esc(p.id)}'">
+        html += `<td class="cal-cell cal-cell-one${todayCls}" onclick="location.href='${postUrl(p)}'">
           <div class="cal-day-num">${dayLabel}</div>
           <span class="cal-post" title="${esc(p.title)}">${esc(displayTitle(p.title))}</span>
         </td>`;
       } else {
         const links = posts.map((p, i) =>
-          `<a href="/post.html?blog=${esc(blogId)}&post=${esc(p.id)}" class="cal-post" title="${esc(p.title)}">${dayNum}${LETTERS[i]} — ${esc(displayTitle(p.title))}</a>`
+          `<a href="${postUrl(p)}" class="cal-post" title="${esc(p.title)}">${dayNum}${LETTERS[i]} — ${esc(displayTitle(p.title))}</a>`
         ).join('');
         html += `<td class="cal-cell${todayCls}">
           <div class="cal-day-num">${dayLabel}</div>
@@ -259,7 +276,8 @@ document.getElementById('create-form').addEventListener('submit', async e => {
   });
   const data = await res.json();
   if (res.ok) {
-    window.location.href = `/post.html?blog=${encodeURIComponent(blogId)}&post=${encodeURIComponent(data.id)}`;
+    const doi = toLocalDateStr(addDays(startDate, LOOKBACK_DAYS));
+    window.location.href = `/post.html?blog=${encodeURIComponent(blogId)}&post=${encodeURIComponent(data.id)}&doi=${encodeURIComponent(doi)}`;
   } else {
     document.getElementById('create-modal-msg').innerHTML = `<div class="error-msg">${data.error}</div>`;
   }

@@ -30,7 +30,9 @@ const blogId = params.get('blog');
 const postId = params.get('post');
 if (!username || !blogId || !postId) window.location.href = '/';
 
-const blogHomeUrl = `/view-calendar.html?user=${encodeURIComponent(username)}&blog=${encodeURIComponent(blogId)}`;
+const doiParam = params.get('doi');
+const blogHomeUrl = `/view-calendar.html?user=${encodeURIComponent(username)}&blog=${encodeURIComponent(blogId)}` +
+  (doiParam ? `&doi=${encodeURIComponent(doiParam)}` : '');
 
 function esc(s) {
   if (!s) return '';

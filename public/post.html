@@ -98,6 +98,8 @@
 const params = new URLSearchParams(location.search);
 const blogId = params.get('blog');
 const postId = params.get('post');
+const doiParam = params.get('doi');
+const calendarUrl = `/calendar.html?blog=${blogId}` + (doiParam ? `&doi=${encodeURIComponent(doiParam)}` : '');
 if (!blogId || !postId) window.location.href = '/dashboard.html';
 
 function esc(s) {
@@ -134,7 +136,8 @@ async function init() {
   currentUsername = username;
   document.getElementById('username-display').textContent = username;
   document.getElementById('view-post-link').href =
-    `/view-post.html?user=${encodeURIComponent(username)}&blog=${encodeURIComponent(blogId)}&post=${encodeURIComponent(postId)}`;
+    `/view-post.html?user=${encodeURIComponent(username)}&blog=${encodeURIComponent(blogId)}&post=${encodeURIComponent(postId)}` +
+    (doiParam ? `&doi=${encodeURIComponent(doiParam)}` : '');
 
   fetch('/api/blogs').then(r => r.json()).then(blogs => {
     const blog = blogs.find(b => b.id === blogId);
@@ -151,7 +154,7 @@ async function loadPost() {
   document.title = post.title;
   document.getElementById('post-title').textContent = post.title;
   document.getElementById('post-title-crumb').textContent = post.title;
-  document.getElementById('blog-link').href = `/calendar.html?blog=${blogId}`;
+  document.getElementById('blog-link').href = calendarUrl;
   document.getElementById('hike-date-input').value = post.hikeDate || '';
   editingBlockId = null;
   selectedImageId = null;
