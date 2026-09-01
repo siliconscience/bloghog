@@ -23,8 +23,11 @@
   </div>
 
   <div class="page-title">
-    <h2 id="post-title"></h2>
-    <a id="view-post-link" href="#" class="btn btn-secondary btn-sm">View Post</a>
+    <input type="text" id="post-title-input" class="title-input" onchange="saveTitle()" onkeydown="if(event.key==='Enter') this.blur()">
+    <div style="display:flex; gap:0.5rem">
+      <a id="view-post-link" href="#" class="btn btn-secondary btn-sm">View Post</a>
+      <button class="btn btn-danger btn-sm" onclick="deletePost()">Delete Post</button>
+    </div>
   </div>
 
   <div class="hike-date-row">
@@ -123,6 +126,7 @@ function linkify(text) {
 
 let currentUsername = null;
 let postContent = [];
+let currentTitle = '';
 let editingBlockId = null;
 let selectedImageId = null;
 let replacingBlockId = null;
@@ -152,7 +156,8 @@ async function loadPost() {
   if (!res.ok) { window.location.href = `/blog.html?id=${blogId}`; return; }
   const post = await res.json();
   document.title = post.title;
-  document.getElementById('post-title').textContent = post.title;
+  currentTitle = post.title;
+  document.getElementById('post-title-input').value = post.title;
   document.getElementById('post-title-crumb').textContent = post.title;
   document.getElementById('blog-link').href = calendarUrl;
   document.getElementById('hike-date-input').value = post.hikeDate || '';
@@ -617,6 +622,27 @@ document.getElementById('image-input').addEventListener('change', async e => {
   else { const d = await res.json(); alert('Upload failed: ' + d.error); }
   e.target.value = '';
 });
+
+async function deletePost() {
+  if (!confirm(`Delete "${currentTitle}"? This cannot be undone.`)) return;
+  const res = await fetch(`/api/blogs/${blogId}/posts/${postId}`, { method: 'DELETE' });
+  if (res.ok) window.location.href = calendarUrl;
+}
+
+async function saveTitle() {
+  const input = document.getElementById('post-title-input');
+  const title = input.value.trim();
+  if (!title) { input.value = currentTitle; return; }
+  if (title === currentTitle) return;
+  await fetch(`/api/blogs/${blogId}/posts/${postId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title })
+  });
+  currentTitle = title;
+  document.title = title;
+  document.getElementById('post-title-crumb').textContent = title;
+}
 
 async function saveHikeDate() {
   const hikeDate = document.getElementById('hike-date-input').value;

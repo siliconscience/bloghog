@@ -75,6 +75,21 @@ form textarea { min-height: 6rem; resize: vertical; }
 
 .page-title h2 { font-size: 1.4rem; }
 
+.title-input {
+  font-size: 1.4rem;
+  font-weight: bold;
+  font-family: inherit;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 0.15rem 0.4rem;
+  margin: 0;
+  background: transparent;
+  min-width: 0;
+  flex: 1;
+}
+.title-input:hover { border-color: #ccc; }
+.title-input:focus { border-color: #999; background: #fff; outline: none; }
+
 /* Auth page */
 .auth-wrapper {
   max-width: 380px;
