@@ -1,5 +1,6 @@
 const express = require('express');
 const session = require('express-session');
+const FileStore = require('session-file-store')(session);
 const bcrypt = require('bcryptjs');
 const multer = require('multer');
 const path = require('path');
@@ -15,6 +16,7 @@ const PORT = process.env.PORT || 8000;
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
 const BLOGS_DIR = path.join(DATA_DIR, 'blogs');
+const SESSIONS_DIR = path.join(DATA_DIR, 'sessions');
 
 function ensureDir(dir) {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -22,6 +24,7 @@ function ensureDir(dir) {
 
 ensureDir(DATA_DIR);
 ensureDir(BLOGS_DIR);
+ensureDir(SESSIONS_DIR);
 if (!fs.existsSync(USERS_FILE)) fs.writeFileSync(USERS_FILE, '{}');
 
 // --- Helpers ---
@@ -74,7 +77,8 @@ app.use('/data/blogs', (req, res, next) => {
 }, express.static(BLOGS_DIR));
 
 app.use(session({
-  secret: 'blog-secret-change-in-prod',
+  store: new FileStore({ path: SESSIONS_DIR }),
+  secret: process.env.SESSION_SECRET || 'blog-secret-change-in-prod',
   resave: false,
   saveUninitialized: false,
   cookie: { maxAge: 7 * 24 * 60 * 60 * 1000 }
