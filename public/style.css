@@ -198,10 +198,11 @@ form textarea { min-height: 6rem; resize: vertical; }
 .table-cell-filled { padding: 0.5rem; cursor: pointer; transition: background 0.1s; }
 .table-cell-filled:hover { background: #f9f9f9; }
 .table-cell-filled p { white-space: pre-wrap; font-size: 0.9rem; line-height: 1.5; }
-.cell-img { max-width: 100%; display: block; margin: 0 auto; }
+.cell-img { max-width: 100%; display: block; margin: 0 auto; user-select: none; -webkit-user-drag: none; }
 .table-row-del { width: 32px; text-align: center; vertical-align: middle; border: none !important; padding: 0 2px; }
-.table-cell[draggable] { cursor: grab; }
+.table-cell[data-block-id] { cursor: grab; touch-action: none; }
 .table-cell.drag-over { outline: 2px solid #555; outline-offset: -2px; background: #f0f0f0; }
+.table-cell.dragging { opacity: 0.4; }
 
 /* Image captions */
 .image-caption { font-size: 0.85rem; color: #666; font-style: italic; text-align: center; margin-top: 0.4rem; }

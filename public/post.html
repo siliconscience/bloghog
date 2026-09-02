@@ -304,12 +304,7 @@ function renderBlock(b) {
 function renderTableCell(blockId, row, col, cell, flatIdx) {
   const id = esc(blockId);
   const onclick = `openCellModal('${id}', ${row}, ${col})`;
-  const drag = `draggable="true"
-    ondragstart="cellDragStart(event,'${id}',${flatIdx})"
-    ondragover="cellDragOver(event)"
-    ondragleave="cellDragLeave(event)"
-    ondrop="cellDrop(event,'${id}',${flatIdx})"
-    ondragend="cellDragEnd(event)"`;
+  const drag = `data-block-id="${id}" data-flat-idx="${flatIdx}" onpointerdown="cellPointerDown(event,'${id}',${flatIdx})"`;
   if (!cell) {
     return `<td class="table-cell table-cell-empty" onclick="${onclick}" ${drag}><span class="cell-add">+</span></td>`;
   }
@@ -318,48 +313,81 @@ function renderTableCell(blockId, row, col, cell, flatIdx) {
   }
   if (cell.type === 'image') {
     return `<td class="table-cell table-cell-filled" onclick="${onclick}" ${drag}>
-      <img src="${esc(cell.url)}" alt="" class="cell-img">
+      <img src="${esc(cell.url)}" alt="" class="cell-img" draggable="false">
       ${cell.caption ? `<p class="image-caption cell-caption">${esc(cell.caption)}</p>` : ''}
     </td>`;
   }
   return `<td class="table-cell" ${drag}></td>`;
 }
 
-// --- Drag-and-drop cell reorder ---
-let dragSrc = null; // { blockId, flatIdx }
+// --- Drag-and-drop cell reorder (Pointer Events: same code path for mouse and touch) ---
+const CELL_DRAG_THRESHOLD = 8; // px of movement before a press counts as a drag rather than a tap
+let cellDragState = null; // { blockId, flatIdx, startX, startY, moved, srcEl, overEl }
+let suppressNextCellClick = false;
 
-function cellDragStart(e, blockId, flatIdx) {
-  dragSrc = { blockId, flatIdx };
-  e.dataTransfer.effectAllowed = 'move';
+function cellPointerDown(e, blockId, flatIdx) {
+  if (e.button !== undefined && e.button !== 0) return; // left button / primary touch only
+  cellDragState = { blockId, flatIdx, startX: e.clientX, startY: e.clientY, moved: false, srcEl: e.currentTarget, overEl: null };
+  document.addEventListener('pointermove', cellPointerMove);
+  document.addEventListener('pointerup', cellPointerUp);
+  document.addEventListener('pointercancel', cellPointerCancel);
 }
 
-function cellDragOver(e) {
+function cellPointerMove(e) {
+  if (!cellDragState) return;
+  const dx = e.clientX - cellDragState.startX;
+  const dy = e.clientY - cellDragState.startY;
+
+  if (!cellDragState.moved) {
+    if (Math.hypot(dx, dy) < CELL_DRAG_THRESHOLD) return;
+    cellDragState.moved = true;
+    suppressNextCellClick = true;
+    cellDragState.srcEl.classList.add('dragging');
+  }
   e.preventDefault();
-  e.dataTransfer.dropEffect = 'move';
-  e.currentTarget.classList.add('drag-over');
-}
 
-function cellDragLeave(e) {
-  if (!e.currentTarget.contains(e.relatedTarget)) {
-    e.currentTarget.classList.remove('drag-over');
+  const target = document.elementFromPoint(e.clientX, e.clientY);
+  const cellEl = target ? target.closest('.table-cell') : null;
+  const isValidTarget = cellEl && cellEl.dataset.blockId === cellDragState.blockId && cellEl !== cellDragState.srcEl;
+
+  if (cellDragState.overEl && cellDragState.overEl !== cellEl) {
+    cellDragState.overEl.classList.remove('drag-over');
+    cellDragState.overEl = null;
+  }
+  if (isValidTarget) {
+    cellEl.classList.add('drag-over');
+    cellDragState.overEl = cellEl;
   }
 }
 
-function cellDrop(e, blockId, flatIdx) {
-  e.preventDefault();
-  e.currentTarget.classList.remove('drag-over');
-  if (!dragSrc || dragSrc.blockId !== blockId || dragSrc.flatIdx === flatIdx) return;
-  fetch(`/api/blogs/${blogId}/posts/${postId}/blocks/${blockId}/order`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from: dragSrc.flatIdx, to: flatIdx })
-  }).then(r => { if (r.ok) loadPost(); });
-  dragSrc = null;
+function cellPointerUp() {
+  if (!cellDragState) return;
+  const { blockId, flatIdx, moved, overEl } = cellDragState;
+  cellCleanupDrag();
+
+  if (moved && overEl) {
+    const toIdx = parseInt(overEl.dataset.flatIdx);
+    fetch(`/api/blogs/${blogId}/posts/${postId}/blocks/${blockId}/order`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from: flatIdx, to: toIdx })
+    }).then(r => { if (r.ok) loadPost(); });
+  }
 }
 
-function cellDragEnd(e) {
-  e.currentTarget.classList.remove('drag-over');
-  dragSrc = null;
+function cellPointerCancel() {
+  cellCleanupDrag();
+}
+
+function cellCleanupDrag() {
+  if (cellDragState) {
+    cellDragState.srcEl.classList.remove('dragging');
+    if (cellDragState.overEl) cellDragState.overEl.classList.remove('drag-over');
+  }
+  cellDragState = null;
+  document.removeEventListener('pointermove', cellPointerMove);
+  document.removeEventListener('pointerup', cellPointerUp);
+  document.removeEventListener('pointercancel', cellPointerCancel);
 }
 
 // --- Table row management ---
@@ -377,6 +405,7 @@ async function deleteTableRow(blockId, row) {
 let cellCtx = null; // { blockId, row, col }
 
 function openCellModal(blockId, row, col) {
+  if (suppressNextCellClick) { suppressNextCellClick = false; return; }
   editingBlockId = null;
   selectedImageId = null;
   cellCtx = { blockId, row, col };
