@@ -251,13 +251,14 @@ function renderCalendar() {
         </td>`;
       } else if (posts.length === 1) {
         const p = posts[0];
+        const photoCls = p.photoCount > 0 ? ' cal-has-photo' : '';
         html += `<td class="cal-cell cal-cell-one${todayCls}" onclick="location.href='${postUrl(p)}'">
           <div class="cal-day-num">${dayLabel}</div>
-          <span class="cal-post" title="${esc(p.title)}">${esc(displayTitle(p.title))}</span>
+          <span class="cal-post${photoCls}" title="${esc(p.title)}">${esc(displayTitle(p.title))}</span>
         </td>`;
       } else {
         const links = posts.map((p, i) =>
-          `<a href="${postUrl(p)}" class="cal-post" title="${esc(p.title)}">${dayNum}${LETTERS[i]} — ${esc(displayTitle(p.title))}</a>`
+          `<a href="${postUrl(p)}" class="cal-post${p.photoCount > 0 ? ' cal-has-photo' : ''}" title="${esc(p.title)}">${dayNum}${LETTERS[i]} — ${esc(displayTitle(p.title))}</a>`
         ).join('');
         html += `<td class="cal-cell${todayCls}">
           <div class="cal-day-num">${dayLabel}</div>

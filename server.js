@@ -57,6 +57,31 @@ function writeJson(file, data) {
   fs.writeFileSync(file, JSON.stringify(data, null, 2));
 }
 
+function countPhotos(content) {
+  let count = 0;
+  for (const block of content) {
+    if (block.type === 'image') count++;
+    else if (block.type === 'table') {
+      for (const row of block.rows) {
+        for (const cell of row) {
+          if (cell && cell.type === 'image') count++;
+        }
+      }
+    }
+  }
+  return count;
+}
+
+function dirSize(dir) {
+  if (!fs.existsSync(dir)) return 0;
+  let total = 0;
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    total += entry.isDirectory() ? dirSize(full) : fs.statSync(full).size;
+  }
+  return total;
+}
+
 function slugify(text) {
   return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 }
@@ -186,9 +211,13 @@ app.get('/api/blogs/:blogId/posts', requireAuth, (req, res) => {
 
   const posts = fs.readdirSync(postsDir)
     .filter(id => fs.existsSync(path.join(postsDir, id, 'meta.json')))
-    .map(id => ({ id, ...readJson(path.join(postsDir, id, 'meta.json')) }));
+    .map(id => {
+      const contentFile = path.join(postsDir, id, 'content.json');
+      const photoCount = fs.existsSync(contentFile) ? countPhotos(readJson(contentFile)) : 0;
+      return { id, ...readJson(path.join(postsDir, id, 'meta.json')), size: dirSize(path.join(postsDir, id)), photoCount };
+    });
 
-  posts.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  posts.sort((a, b) => new Date(b.hikeDate || b.createdAt) - new Date(a.hikeDate || a.createdAt));
   res.json(posts);
 });
 
@@ -631,8 +660,12 @@ app.get('/api/view/:username/:blogId/posts', (req, res) => {
   if (!fs.existsSync(postsDir)) return res.json([]);
   const posts = fs.readdirSync(postsDir)
     .filter(id => fs.existsSync(path.join(postsDir, id, 'meta.json')))
-    .map(id => ({ id, ...readJson(path.join(postsDir, id, 'meta.json')) }));
-  posts.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    .map(id => {
+      const contentFile = path.join(postsDir, id, 'content.json');
+      const photoCount = fs.existsSync(contentFile) ? countPhotos(readJson(contentFile)) : 0;
+      return { id, ...readJson(path.join(postsDir, id, 'meta.json')), photoCount };
+    });
+  posts.sort((a, b) => new Date(b.hikeDate || b.createdAt) - new Date(a.hikeDate || a.createdAt));
   res.json(posts);
 });
 

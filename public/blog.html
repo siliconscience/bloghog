@@ -30,6 +30,18 @@
 
   <p id="blog-purpose" style="color:#666; margin-bottom:1.25rem"></p>
 
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem">
+    <p id="blog-total-size" style="color:#888; font-size:0.85rem; margin:0"></p>
+    <div style="display:flex; gap:0.5rem; align-items:center">
+      <label for="sort-field" style="font-size:0.85rem; color:#666; margin:0">Sort by:</label>
+      <select id="sort-field" onchange="renderPosts()">
+        <option value="date">Date</option>
+        <option value="size">Size</option>
+      </select>
+      <button class="btn btn-secondary btn-sm" id="sort-dir-btn" onclick="toggleSortDir()" title="Toggle ascending/descending">&#8595;</button>
+    </div>
+  </div>
+
   <div id="posts-list"></div>
 </div>
 
@@ -61,7 +73,15 @@ function esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+function formatSize(bytes) {
+  if (bytes >= 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  return (bytes / 1024).toFixed(0) + ' KB';
+}
+
 let currentUsername = null;
+let allPosts = [];
+let sortField = 'date';
+let sortDir = 'desc';
 
 async function init() {
   const me = await fetch('/auth/me');
@@ -89,16 +109,40 @@ async function loadBlog() {
 
 async function loadPosts() {
   const res = await fetch(`/api/blogs/${blogId}/posts`);
-  const posts = await res.json();
+  allPosts = await res.json();
+
+  const totalSize = allPosts.reduce((sum, p) => sum + (p.size || 0), 0);
+  document.getElementById('blog-total-size').textContent =
+    allPosts.length ? `Total size: ${formatSize(totalSize)} across ${allPosts.length} post${allPosts.length === 1 ? '' : 's'}` : '';
+
+  renderPosts();
+}
+
+function toggleSortDir() {
+  sortDir = sortDir === 'desc' ? 'asc' : 'desc';
+  document.getElementById('sort-dir-btn').innerHTML = sortDir === 'desc' ? '&#8595;' : '&#8593;';
+  renderPosts();
+}
+
+function renderPosts() {
+  sortField = document.getElementById('sort-field').value;
   const el = document.getElementById('posts-list');
-  if (!posts.length) {
+
+  if (!allPosts.length) {
     el.innerHTML = '<p style="color:#888">No posts yet. Create the first one!</p>';
     return;
   }
-  el.innerHTML = posts.map(p => `
+
+  const sorted = [...allPosts].sort((a, b) => {
+    const av = sortField === 'size' ? (a.size || 0) : new Date(a.hikeDate || a.createdAt);
+    const bv = sortField === 'size' ? (b.size || 0) : new Date(b.hikeDate || b.createdAt);
+    return sortDir === 'asc' ? av - bv : bv - av;
+  });
+
+  el.innerHTML = sorted.map(p => `
     <div class="card">
       <h2>${esc(p.title)}</h2>
-      <p>${new Date(p.createdAt).toLocaleDateString()}</p>
+      <p>${new Date(p.hikeDate || p.createdAt).toLocaleDateString()} &middot; ${formatSize(p.size || 0)} &middot; ${p.photoCount || 0} photo${p.photoCount === 1 ? '' : 's'}</p>
       <div style="display:flex; gap:0.5rem; margin-top:0.5rem">
         <a href="/post.html?blog=${esc(blogId)}&post=${esc(p.id)}" class="btn btn-secondary btn-sm">Edit</a>
         <a href="/view-post.html?user=${esc(currentUsername)}&blog=${esc(blogId)}&post=${esc(p.id)}" class="btn btn-secondary btn-sm">View</a>

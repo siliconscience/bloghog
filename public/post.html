@@ -84,7 +84,7 @@
 
 <!-- Cell editor modal -->
 <div class="modal-overlay" id="cell-modal">
-  <div class="modal">
+  <div class="modal modal-large">
     <h3 id="cell-modal-title">Cell</h3>
     <div id="cell-modal-body"></div>
     <div class="modal-actions" id="cell-modal-actions"></div>
@@ -122,6 +122,41 @@ function linkify(text) {
   }
   if (last < text.length) parts.push(esc(text.slice(last)));
   return parts.join('');
+}
+
+// --- Client-side image size reduction (offered when an upload looks large) ---
+const REDUCE_AVG_THRESHOLD = 1 * 1024 * 1024;    // 1 MB average per image
+const REDUCE_TOTAL_THRESHOLD = 10 * 1024 * 1024; // 10 MB total
+const REDUCE_MAX_DIM = 1600; // ~2x the blog's 800px display width, so no visible quality loss on the page
+const REDUCE_QUALITY = 0.85;
+
+async function resizeImageFile(file) {
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, REDUCE_MAX_DIM / Math.max(bitmap.width, bitmap.height));
+  if (scale >= 1) return file; // already small enough
+  const w = Math.round(bitmap.width * scale);
+  const h = Math.round(bitmap.height * scale);
+  const canvas = document.createElement('canvas');
+  canvas.width = w; canvas.height = h;
+  canvas.getContext('2d').drawImage(bitmap, 0, 0, w, h);
+  const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', REDUCE_QUALITY));
+  return new File([blob], file.name.replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' });
+}
+
+async function maybeReduceImages(fileList) {
+  const files = Array.from(fileList);
+  const total = files.reduce((s, f) => s + f.size, 0);
+  const avg = total / files.length;
+  if (avg <= REDUCE_AVG_THRESHOLD && total <= REDUCE_TOTAL_THRESHOLD) return files;
+
+  const mb = n => (n / (1024 * 1024)).toFixed(1);
+  const reduce = confirm(
+    `These image(s) total ${mb(total)} MB (avg ${mb(avg)} MB each). Reduce them for upload? ` +
+    `This resizes to the blog's display size and recompresses — much smaller files, ` +
+    `no visible quality loss on the page.`
+  );
+  if (!reduce) return files;
+  return Promise.all(files.map(resizeImageFile));
 }
 
 let currentUsername = null;
@@ -584,8 +619,9 @@ function pickCellImage() {
 document.getElementById('cell-image-input').addEventListener('change', async e => {
   const file = e.target.files[0];
   if (!file || !cellCtx) return;
+  const [reduced] = await maybeReduceImages([file]);
   const form = new FormData();
-  form.append('image', file);
+  form.append('image', reduced);
   const { blockId, row, col } = cellCtx;
   const res = await fetch(`/api/blogs/${blogId}/posts/${postId}/blocks/${blockId}/cells/${row}/${col}/image`, {
     method: 'PUT', body: form
@@ -672,8 +708,9 @@ async function deleteBlock(id) {
 document.getElementById('replace-image-input').addEventListener('change', async e => {
   const file = e.target.files[0];
   if (!file || !replacingBlockId) return;
+  const [reduced] = await maybeReduceImages([file]);
   const form = new FormData();
-  form.append('image', file);
+  form.append('image', reduced);
   const res = await fetch(`/api/blogs/${blogId}/posts/${postId}/blocks/${replacingBlockId}/image`, { method: 'PUT', body: form });
   if (res.ok) loadPost();
   else { const d = await res.json(); alert('Upload failed: ' + d.error); }
@@ -711,8 +748,9 @@ document.getElementById('gallery-input').addEventListener('change', async e => {
   const files = e.target.files;
   if (!files.length) return;
   const pos = pendingInsertAt; pendingInsertAt = null;
+  const reducedFiles = await maybeReduceImages(files);
   const form = new FormData();
-  for (const file of files) form.append('images', file);
+  for (const file of reducedFiles) form.append('images', file);
   if (pos !== null) form.append('insertAt', pos);
   const res = await fetch(`/api/blogs/${blogId}/posts/${postId}/blocks/gallery`, { method: 'POST', body: form });
   if (res.ok) loadPost();
@@ -724,8 +762,9 @@ document.getElementById('image-input').addEventListener('change', async e => {
   const file = e.target.files[0];
   if (!file) return;
   const pos = pendingInsertAt; pendingInsertAt = null;
+  const [reduced] = await maybeReduceImages([file]);
   const form = new FormData();
-  form.append('image', file);
+  form.append('image', reduced);
   if (pos !== null) form.append('insertAt', pos);
   const res = await fetch(`/api/blogs/${blogId}/posts/${postId}/blocks/image`, { method: 'POST', body: form });
   if (res.ok) loadPost();
