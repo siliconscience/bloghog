@@ -60,6 +60,26 @@ function writeJson(file, data) {
   fs.writeFileSync(file, JSON.stringify(data, null, 2));
 }
 
+// Recomputes each image's url from its stored filename plus the CURRENT username/blogId/postId,
+// rather than trusting whatever was baked in at upload time. This means a post's images keep
+// working after the blog is renamed or the post is moved to a different blog, with no JSON
+// rewriting needed elsewhere — only `filename` is treated as durable, `url` is derived on every read.
+function withResolvedImageUrls(content, username, blogId, postId) {
+  const base = `/data/blogs/${username}/${blogId}/posts/${postId}/images/`;
+  return content.map(block => {
+    if (block.type === 'image' && block.filename) {
+      return { ...block, url: base + block.filename };
+    }
+    if (block.type === 'table') {
+      const rows = block.rows.map(row => row.map(cell =>
+        (cell && cell.type === 'image' && cell.filename) ? { ...cell, url: base + cell.filename } : cell
+      ));
+      return { ...block, rows };
+    }
+    return block;
+  });
+}
+
 function countPhotos(content) {
   let count = 0;
   for (const block of content) {
@@ -219,6 +239,34 @@ app.post('/api/account/avatar', requireAuth, avatarUpload.single('avatar'), asyn
   }
 });
 
+app.put('/api/account/username', requireAuth, async (req, res) => {
+  const { newUsername, currentPassword } = req.body;
+  if (!newUsername || !currentPassword) return res.status(400).json({ error: 'New username and current password required' });
+  if (!/^[a-zA-Z0-9_-]{3,32}$/.test(newUsername)) return res.status(400).json({ error: 'Invalid username' });
+
+  const oldUsername = req.session.username;
+  if (newUsername === oldUsername) return res.status(400).json({ error: 'That is already your username' });
+
+  const users = readUsers();
+  const user = users[oldUsername];
+  const ok = await bcrypt.compare(currentPassword, user.passwordHash);
+  if (!ok) return res.status(401).json({ error: 'Current password is incorrect' });
+  if (users[newUsername]) return res.status(409).json({ error: 'Username taken' });
+
+  const oldDir = userBlogsDir(oldUsername);
+  if (fs.existsSync(oldDir)) fs.renameSync(oldDir, userBlogsDir(newUsername));
+
+  const oldAvatar = path.join(AVATARS_DIR, `${oldUsername}.jpg`);
+  if (fs.existsSync(oldAvatar)) fs.renameSync(oldAvatar, path.join(AVATARS_DIR, `${newUsername}.jpg`));
+
+  users[newUsername] = user;
+  delete users[oldUsername];
+  writeUsers(users);
+
+  req.session.username = newUsername;
+  res.json({ username: newUsername });
+});
+
 // --- Blog routes ---
 app.get('/api/blogs', requireAuth, (req, res) => {
   const dir = userBlogsDir(req.session.username);
@@ -368,7 +416,9 @@ app.get('/api/blogs/:blogId/posts/:postId', requireAuth, (req, res) => {
   if (!fs.existsSync(dir)) return res.status(404).json({ error: 'Not found' });
 
   const meta = readJson(path.join(dir, 'meta.json'));
-  const content = readJson(path.join(dir, 'content.json'));
+  const content = withResolvedImageUrls(
+    readJson(path.join(dir, 'content.json')), req.session.username, req.params.blogId, req.params.postId
+  );
   res.json({ id: req.params.postId, ...meta, content });
 });
 
@@ -728,7 +778,9 @@ app.get('/api/view/:username/:blogId/posts/:postId', (req, res) => {
   const dir = postDir(req.params.username, req.params.blogId, req.params.postId);
   if (!fs.existsSync(dir)) return res.status(404).json({ error: 'Not found' });
   const meta = readJson(path.join(dir, 'meta.json'));
-  const content = readJson(path.join(dir, 'content.json'));
+  const content = withResolvedImageUrls(
+    readJson(path.join(dir, 'content.json')), req.params.username, req.params.blogId, req.params.postId
+  );
   res.json({ id: req.params.postId, ...meta, content });
 });
 
