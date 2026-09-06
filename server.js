@@ -6,7 +6,8 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
-const { fetchWpPost, parseContentBlocks, downloadImage } = require('./lib/wordpress-import');
+const sharp = require('sharp');
+const { fetchWpPost, parseContentBlocks, downloadImage, parseDateFromTitle } = require('./lib/wordpress-import');
 
 const app = express();
 // Use Railway's provided port if available, otherwise fall back to 8000 locally
@@ -18,6 +19,7 @@ const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
 const BLOGS_DIR = path.join(DATA_DIR, 'blogs');
 const SESSIONS_DIR = path.join(DATA_DIR, 'sessions');
+const AVATARS_DIR = path.join(DATA_DIR, 'avatars');
 
 function ensureDir(dir) {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -26,6 +28,7 @@ function ensureDir(dir) {
 ensureDir(DATA_DIR);
 ensureDir(BLOGS_DIR);
 ensureDir(SESSIONS_DIR);
+ensureDir(AVATARS_DIR);
 if (!fs.existsSync(USERS_FILE)) fs.writeFileSync(USERS_FILE, '{}');
 
 // --- Helpers ---
@@ -101,6 +104,7 @@ app.use('/data/blogs', (req, res, next) => {
   if (/\.(jpg|jpeg|png|gif|webp)$/i.test(req.path)) return next();
   res.status(403).send('Forbidden');
 }, express.static(BLOGS_DIR));
+app.use('/data/avatars', express.static(AVATARS_DIR));
 
 app.use(session({
   store: new FileStore({ path: SESSIONS_DIR }),
@@ -129,6 +133,15 @@ const storage = multer.diskStorage({
 });
 const upload = multer({
   storage,
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter(req, file, cb) {
+    if (/^image\//i.test(file.mimetype)) cb(null, true);
+    else cb(new Error('Only images allowed'));
+  }
+});
+
+const avatarUpload = multer({
+  storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter(req, file, cb) {
     if (/^image\//i.test(file.mimetype)) cb(null, true);
@@ -177,6 +190,35 @@ app.get('/auth/me', (req, res) => {
   else res.status(401).json({ error: 'Not authenticated' });
 });
 
+// --- Account routes ---
+app.put('/api/account/password', requireAuth, async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+  if (!currentPassword || !newPassword) return res.status(400).json({ error: 'Current and new password required' });
+
+  const users = readUsers();
+  const user = users[req.session.username];
+  const ok = await bcrypt.compare(currentPassword, user.passwordHash);
+  if (!ok) return res.status(401).json({ error: 'Current password is incorrect' });
+
+  user.passwordHash = await bcrypt.hash(newPassword, 12);
+  writeUsers(users);
+  res.json({ ok: true });
+});
+
+app.post('/api/account/avatar', requireAuth, avatarUpload.single('avatar'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'Photo required' });
+  try {
+    const buffer = await sharp(req.file.buffer)
+      .resize({ width: 256, height: 256, fit: 'cover' })
+      .jpeg({ quality: 85 })
+      .toBuffer();
+    fs.writeFileSync(path.join(AVATARS_DIR, `${req.session.username}.jpg`), buffer);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to process image' });
+  }
+});
+
 // --- Blog routes ---
 app.get('/api/blogs', requireAuth, (req, res) => {
   const dir = userBlogsDir(req.session.username);
@@ -202,6 +244,19 @@ app.post('/api/blogs', requireAuth, (req, res) => {
   writeJson(path.join(dir, 'meta.json'), meta);
 
   res.status(201).json({ id, ...meta });
+});
+
+app.patch('/api/blogs/:blogId', requireAuth, (req, res) => {
+  const dir = blogDir(req.session.username, req.params.blogId);
+  const metaFile = path.join(dir, 'meta.json');
+  if (!fs.existsSync(metaFile)) return res.status(404).json({ error: 'Blog not found' });
+
+  const meta = readJson(metaFile);
+  if (req.body.name !== undefined) meta.name = req.body.name;
+  if (req.body.purpose !== undefined) meta.purpose = req.body.purpose;
+  writeJson(metaFile, meta);
+
+  res.json({ id: req.params.blogId, ...meta });
 });
 
 // --- Post routes ---
@@ -250,7 +305,7 @@ app.post('/api/blogs/:blogId/posts/import-wordpress', requireAuth, async (req, r
   }
 
   const title = titleOverride || wpPost.title;
-  const hikeDate = hikeDateOverride || wpPost.date.slice(0, 10);
+  const hikeDate = hikeDateOverride || parseDateFromTitle(title) || wpPost.date.slice(0, 10);
 
   const id = uuidv4();
   const dir = postDir(req.session.username, req.params.blogId, id);

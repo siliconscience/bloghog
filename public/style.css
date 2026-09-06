@@ -22,6 +22,32 @@ header h1 { font-size: 1.25rem; }
 
 header .user-info { font-size: 0.875rem; color: #555; display: flex; gap: 1rem; align-items: center; }
 
+.account-menu-dropdown {
+  display: none;
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+  padding: 1rem;
+  min-width: 200px;
+  z-index: 50;
+}
+.account-menu-dropdown.open { display: block; }
+.account-menu-avatar-row { display: flex; flex-direction: column; align-items: center; gap: 0.4rem; margin-bottom: 0.75rem; }
+.account-avatar-wrap {
+  width: 64px; height: 64px; border-radius: 50%; overflow: hidden; cursor: pointer;
+  border: 1px solid #ddd; position: relative; background: #f0f0f0;
+}
+.account-avatar-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.account-avatar-placeholder {
+  position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
+  font-size: 1.5rem; color: #aaa;
+}
+.account-menu-hint { font-size: 0.75rem; color: #888; }
+
 .btn {
   display: inline-block;
   padding: 0.5rem 1rem;

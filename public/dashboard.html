@@ -42,12 +42,13 @@
   </div>
 </div>
 
+<script src="account-menu.js"></script>
 <script>
 async function init() {
   const me = await fetch('/auth/me');
   if (!me.ok) { window.location.href = '/'; return; }
   const { username } = await me.json();
-  document.getElementById('username-display').textContent = username;
+  initAccountMenu(username);
   loadBlogs();
 }
 

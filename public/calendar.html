@@ -100,6 +100,7 @@
   </div>
 </div>
 
+<script src="account-menu.js"></script>
 <script>
 const params = new URLSearchParams(location.search);
 const blogId = params.get('blog');
@@ -151,7 +152,7 @@ async function init() {
   const me = await fetch('/auth/me');
   if (!me.ok) { window.location.href = '/'; return; }
   const { username } = await me.json();
-  document.getElementById('username-display').textContent = username;
+  initAccountMenu(username);
 
   const blogsRes = await fetch('/api/blogs');
   const blogs = await blogsRes.json();

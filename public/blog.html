@@ -23,6 +23,7 @@
     <div style="display:flex; gap:0.5rem; align-items:center">
       <a id="view-blog-link" href="#" class="btn btn-secondary btn-sm">View Blog</a>
       <a id="calendar-link" href="#" class="btn btn-secondary btn-sm">Calendar</a>
+      <button class="btn btn-secondary btn-sm" onclick="openEditBlogModal()">Edit Info</button>
       <button class="btn btn-danger btn-sm" onclick="deleteBlog()">Delete Blog</button>
       <button class="btn btn-primary" onclick="openModal()">+ New Post</button>
     </div>
@@ -45,6 +46,24 @@
   <div id="posts-list"></div>
 </div>
 
+<!-- Edit Blog Info Modal -->
+<div class="modal-overlay" id="edit-blog-modal">
+  <div class="modal">
+    <h3>Edit Blog Info</h3>
+    <div id="edit-blog-modal-msg"></div>
+    <form id="edit-blog-form">
+      <label>Name</label>
+      <input type="text" id="edit-blog-name" required>
+      <label>Purpose / Description</label>
+      <textarea id="edit-blog-purpose"></textarea>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" onclick="closeEditBlogModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <!-- New Post Modal -->
 <div class="modal-overlay" id="modal">
   <div class="modal">
@@ -63,6 +82,7 @@
   </div>
 </div>
 
+<script src="account-menu.js"></script>
 <script>
 const params = new URLSearchParams(location.search);
 const blogId = params.get('id');
@@ -82,13 +102,14 @@ let currentUsername = null;
 let allPosts = [];
 let sortField = 'date';
 let sortDir = 'desc';
+let currentBlog = null;
 
 async function init() {
   const me = await fetch('/auth/me');
   if (!me.ok) { window.location.href = '/'; return; }
   const { username } = await me.json();
   currentUsername = username;
-  document.getElementById('username-display').textContent = username;
+  initAccountMenu(username);
   loadBlog();
 }
 
@@ -97,6 +118,7 @@ async function loadBlog() {
   const blogs = await res.json();
   const blog = blogs.find(b => b.id === blogId);
   if (!blog) { window.location.href = '/dashboard.html'; return; }
+  currentBlog = blog;
   document.title = blog.name;
   document.getElementById('blog-title').textContent = blog.name;
   document.getElementById('blog-name-crumb').textContent = blog.name;
@@ -180,6 +202,37 @@ async function deleteBlog() {
   const res = await fetch(`/api/blogs/${blogId}`, { method: 'DELETE' });
   if (res.ok) window.location.href = '/dashboard.html';
 }
+
+function openEditBlogModal() {
+  document.getElementById('edit-blog-name').value = currentBlog.name;
+  document.getElementById('edit-blog-purpose').value = currentBlog.purpose || '';
+  document.getElementById('edit-blog-modal').classList.add('open');
+  document.getElementById('edit-blog-name').focus();
+}
+
+function closeEditBlogModal() {
+  document.getElementById('edit-blog-modal').classList.remove('open');
+  document.getElementById('edit-blog-modal-msg').innerHTML = '';
+}
+
+document.getElementById('edit-blog-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const res = await fetch(`/api/blogs/${blogId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: document.getElementById('edit-blog-name').value,
+      purpose: document.getElementById('edit-blog-purpose').value
+    })
+  });
+  const data = await res.json();
+  if (res.ok) {
+    closeEditBlogModal();
+    loadBlog();
+  } else {
+    document.getElementById('edit-blog-modal-msg').innerHTML = `<div class="error-msg">${data.error}</div>`;
+  }
+});
 
 function openModal() {
   const today = new Date().toISOString().slice(0, 10);

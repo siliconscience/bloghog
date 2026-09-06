@@ -97,6 +97,7 @@
 <input type="file" id="cell-image-input" accept="image/*" style="display:none">
 <input type="file" id="gallery-input" accept="image/*" multiple style="display:none">
 
+<script src="account-menu.js"></script>
 <script>
 const params = new URLSearchParams(location.search);
 const blogId = params.get('blog');
@@ -173,7 +174,7 @@ async function init() {
   if (!me.ok) { window.location.href = '/'; return; }
   const { username } = await me.json();
   currentUsername = username;
-  document.getElementById('username-display').textContent = username;
+  initAccountMenu(username);
   document.getElementById('view-post-link').href =
     `/view-post.html?user=${encodeURIComponent(username)}&blog=${encodeURIComponent(blogId)}&post=${encodeURIComponent(postId)}` +
     (doiParam ? `&doi=${encodeURIComponent(doiParam)}` : '');
