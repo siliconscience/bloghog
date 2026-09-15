@@ -91,6 +91,24 @@
   </div>
 </div>
 
+<!-- Large upload / compression modal -->
+<div class="modal-overlay" id="reduce-modal">
+  <div class="modal">
+    <h3>Large Upload</h3>
+    <p id="reduce-modal-msg"></p>
+    <div id="reduce-checkbox-row" style="display:none; margin:0.75rem 0">
+      <label style="display:flex; align-items:center; gap:0.5rem; font-weight:normal">
+        <input type="checkbox" id="reduce-confirm-checkbox">
+        <span id="reduce-checkbox-label"></span>
+      </label>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-secondary" id="reduce-skip-btn">Upload without compressing</button>
+      <button type="button" class="btn btn-primary" id="reduce-compress-btn">Compress &amp; Upload</button>
+    </div>
+  </div>
+</div>
+
 <!-- Hidden file inputs -->
 <input type="file" id="image-input" accept="image/*" style="display:none">
 <input type="file" id="replace-image-input" accept="image/*" style="display:none">
@@ -144,19 +162,53 @@ async function resizeImageFile(file) {
   return new File([blob], file.name.replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' });
 }
 
+function showReduceDialog(total, avg) {
+  const mb = n => (n / (1024 * 1024)).toFixed(1);
+  return new Promise(resolve => {
+    const modal = document.getElementById('reduce-modal');
+    const msg = document.getElementById('reduce-modal-msg');
+    const checkboxRow = document.getElementById('reduce-checkbox-row');
+    const checkboxLabel = document.getElementById('reduce-checkbox-label');
+    const checkbox = document.getElementById('reduce-confirm-checkbox');
+    const skipBtn = document.getElementById('reduce-skip-btn');
+    const compressBtn = document.getElementById('reduce-compress-btn');
+
+    msg.textContent = `These image(s) total ${mb(total)} MB (avg ${mb(avg)} MB each). ` +
+      `Compressing resizes to the blog's display size and recompresses — much smaller files, no visible quality loss on the page.`;
+
+    const requireCheckbox = total > REDUCE_TOTAL_THRESHOLD;
+    checkbox.checked = false;
+    checkboxRow.style.display = requireCheckbox ? 'block' : 'none';
+    checkboxLabel.textContent = `Yes, I really want to add ${mb(total)} MB`;
+
+    function cleanup() {
+      modal.classList.remove('open');
+      skipBtn.onclick = null;
+      compressBtn.onclick = null;
+    }
+
+    compressBtn.onclick = () => { cleanup(); resolve(true); };
+    skipBtn.onclick = () => {
+      if (requireCheckbox && !checkbox.checked) {
+        alert('Check the box first to confirm you want to upload without compressing.');
+        return;
+      }
+      cleanup();
+      resolve(false);
+    };
+
+    modal.classList.add('open');
+  });
+}
+
 async function maybeReduceImages(fileList) {
   const files = Array.from(fileList);
   const total = files.reduce((s, f) => s + f.size, 0);
   const avg = total / files.length;
   if (avg <= REDUCE_AVG_THRESHOLD && total <= REDUCE_TOTAL_THRESHOLD) return files;
 
-  const mb = n => (n / (1024 * 1024)).toFixed(1);
-  const reduce = confirm(
-    `These image(s) total ${mb(total)} MB (avg ${mb(avg)} MB each). Reduce them for upload? ` +
-    `This resizes to the blog's display size and recompresses — much smaller files, ` +
-    `no visible quality loss on the page.`
-  );
-  if (!reduce) return files;
+  const shouldReduce = await showReduceDialog(total, avg);
+  if (!shouldReduce) return files;
   return Promise.all(files.map(resizeImageFile));
 }
 
