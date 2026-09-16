@@ -25,6 +25,7 @@
   <div class="page-title">
     <input type="text" id="post-title-input" class="title-input" onchange="saveTitle()" onkeydown="if(event.key==='Enter') this.blur()">
     <div style="display:flex; gap:0.5rem">
+      <a id="back-to-blog-link" href="#" class="btn btn-secondary btn-sm">← Back to blog</a>
       <a id="view-post-link" href="#" class="btn btn-secondary btn-sm">View Post</a>
       <button class="btn btn-danger btn-sm" onclick="deletePost()">Delete Post</button>
     </div>
@@ -253,6 +254,7 @@ async function loadPost() {
   const postDoi = (post.hikeDate || post.createdAt).slice(0, 10);
   calendarUrl = `/calendar.html?blog=${blogId}&doi=${encodeURIComponent(postDoi)}`;
   document.getElementById('blog-link').href = calendarUrl;
+  document.getElementById('back-to-blog-link').href = calendarUrl;
   document.getElementById('view-post-link').href =
     `/view-post.html?user=${encodeURIComponent(currentUsername)}&blog=${encodeURIComponent(blogId)}&post=${encodeURIComponent(postId)}&doi=${encodeURIComponent(postDoi)}`;
   document.getElementById('hike-date-input').value = post.hikeDate || '';
