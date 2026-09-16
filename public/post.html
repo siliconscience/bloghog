@@ -121,7 +121,7 @@ const params = new URLSearchParams(location.search);
 const blogId = params.get('blog');
 const postId = params.get('post');
 const doiParam = params.get('doi');
-const calendarUrl = `/calendar.html?blog=${blogId}` + (doiParam ? `&doi=${encodeURIComponent(doiParam)}` : '');
+let calendarUrl = `/calendar.html?blog=${blogId}` + (doiParam ? `&doi=${encodeURIComponent(doiParam)}` : '');
 if (!blogId || !postId) window.location.href = '/dashboard.html';
 
 function esc(s) {
@@ -247,7 +247,14 @@ async function loadPost() {
   currentTitle = post.title;
   document.getElementById('post-title-input').value = post.title;
   document.getElementById('post-title-crumb').textContent = post.title;
+
+  // Point "Blog" breadcrumb at the calendar on this post's own date, so it works
+  // even when arriving from a list view that doesn't carry a doi param.
+  const postDoi = (post.hikeDate || post.createdAt).slice(0, 10);
+  calendarUrl = `/calendar.html?blog=${blogId}&doi=${encodeURIComponent(postDoi)}`;
   document.getElementById('blog-link').href = calendarUrl;
+  document.getElementById('view-post-link').href =
+    `/view-post.html?user=${encodeURIComponent(currentUsername)}&blog=${encodeURIComponent(blogId)}&post=${encodeURIComponent(postId)}&doi=${encodeURIComponent(postDoi)}`;
   document.getElementById('hike-date-input').value = post.hikeDate || '';
   editingBlockId = null;
   selectedImageId = null;

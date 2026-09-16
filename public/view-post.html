@@ -94,6 +94,13 @@ async function init() {
   document.getElementById('post-date').textContent =
     new Date(post.createdAt).toLocaleDateString(undefined, { year:'numeric', month:'long', day:'numeric' });
 
+  // Point "back to blog" at the calendar on this post's own date, so it works
+  // even when arriving from a list view that doesn't carry a doi param.
+  const postDoi = (post.hikeDate || post.createdAt).slice(0, 10);
+  const postDoiUrl = `/view-calendar.html?user=${encodeURIComponent(username)}&blog=${encodeURIComponent(blogId)}&doi=${encodeURIComponent(postDoi)}`;
+  document.getElementById('back-link').href = postDoiUrl;
+  document.getElementById('blog-name-header').onclick = () => window.location.href = postDoiUrl;
+
   const el = document.getElementById('post-content');
   if (!post.content.length) {
     el.innerHTML = '<p style="color:#aaa; font-style:italic">This post has no content yet.</p>';
