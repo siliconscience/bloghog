@@ -102,12 +102,12 @@ async function init() {
 
   el.innerHTML = post.content.map(b => {
     if (b.type === 'text') return `<div class="block"><p>${linkify(b.text)}</p></div>`;
-    if (b.type === 'image') return `<div class="block"><img src="${esc(b.url)}" alt="" style="cursor:zoom-in" onclick="openLightbox('${esc(b.url)}','${esc(b.caption || '')}')">${b.caption ? `<p class="image-caption">${esc(b.caption)}</p>` : ''}</div>`;
+    if (b.type === 'image') return `<div class="block"><img src="${esc(b.url)}" alt="" loading="lazy" style="cursor:zoom-in" onclick="openLightbox('${esc(b.url)}','${esc(b.caption || '')}')">${b.caption ? `<p class="image-caption">${esc(b.caption)}</p>` : ''}</div>`;
     if (b.type === 'table') {
       const rows = b.rows.map(row => `<tr>${row.map(cell => {
         if (!cell) return '<td class="table-cell"></td>';
         if (cell.type === 'text') return `<td class="table-cell table-cell-filled"><p>${linkify(cell.text)}</p></td>`;
-        if (cell.type === 'image') return `<td class="table-cell table-cell-filled"><img src="${esc(cell.url)}" alt="" class="cell-img" style="cursor:zoom-in" onclick="openLightbox('${esc(cell.url)}','${esc(cell.caption || '')}')">${cell.caption ? `<p class="image-caption cell-caption">${esc(cell.caption)}</p>` : ''}</td>`;
+        if (cell.type === 'image') return `<td class="table-cell table-cell-filled"><img src="${esc(cell.url)}" alt="" class="cell-img" loading="lazy" style="cursor:zoom-in" onclick="openLightbox('${esc(cell.url)}','${esc(cell.caption || '')}')">${cell.caption ? `<p class="image-caption cell-caption">${esc(cell.caption)}</p>` : ''}</td>`;
         return '<td class="table-cell"></td>';
       }).join('')}</tr>`).join('');
       return `<div class="block"><table class="content-table"><tbody>${rows}</tbody></table></div>`;
